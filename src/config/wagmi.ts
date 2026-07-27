@@ -4,6 +4,11 @@ import { mainnet, sepolia } from 'wagmi/chains'
 
 const rpcSepolia = import.meta.env.VITE_RPC_SEPOLIA as string | undefined
 const rpcMainnet = import.meta.env.VITE_RPC_MAINNET as string | undefined
+const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined
+
+if (!walletConnectProjectId) {
+  throw new Error('VITE_WALLETCONNECT_PROJECT_ID is required — set it in .env (Reown dashboard project ID)')
+}
 
 // Only offer chains that actually have contract addresses configured in env.
 // Falling back to sepolia keeps the app runnable when nothing is set.
@@ -16,7 +21,7 @@ const chains = (configuredChains.length > 0 ? configuredChains : [sepolia]) as u
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'PEN — Perpetual Endowment Network',
-  projectId: 'pen-frontend',
+  projectId: walletConnectProjectId,
   chains,
   transports: {
     [sepolia.id]:  rpcSepolia  ? http(rpcSepolia)  : http(),
