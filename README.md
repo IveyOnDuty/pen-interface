@@ -6,7 +6,56 @@ Built with React 19, Vite, wagmi v2, RainbowKit, and TanStack Query. Styled with
 
 ---
 
+## Roadmap
+
+Rollout phases for taking the frontend from local dev to a live deployment. Each phase links to the relevant section below.
+
+
+| Phase                         | Goal                                            | Status                                                                                                                                                                                 |
+| ----------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Local dev**              | Run the app against Sepolia contracts           | **Done** — `.env` configured, dev server on Sepolia. See [How to Run](#how-to-run).                                                                                                    |
+| **2. Flow validation**        | Confirm every user-facing path works on Sepolia | **Done** on Sepolia; mainnet smoke-test after Phase 6 deploy. See [Phase 2 checklist](#phase-2-flow-validation) below. |
+| **3. Production build**       | Verify the static bundle before pinning         | **Done** — `npm run build` passes. See [Production build](#production-build). |
+| **4. Sepolia staging (IPFS)** | Deploy a testnet build users can reach          | **Done** — Sepolia build pinned and smoke-tested. See [Deploying to IPFS](#deploying-to-ipfs). |
+| **5. Stable URL**             | Stop handing out raw CIDs                       | **Done** — `shutterpen.eth` contenthash → IPFS. Update on each release. See [Give it a stable URL](#give-it-a-stable-url). |
+| **6. Mainnet production**     | Go live with real assets                        | **Done** — mainnet on `shutterpen.eth`; use Alchemy in `.env.production.local` for RPC. Rebuild + re-pin when RPC changes. |
+
+
+
+
+### Phase 2 — Flow validation
+
+**Automated (no wallet):**
+
+```bash
+npm run validate:reads   # hits every on-chain read path the UI uses
+```
+
+**Manual (wallet on Sepolia, app at** `http://localhost:5173`**):**
+
+
+| Screen               | What to verify                                                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Metrics**          | SEAT stats, tranche bar/table, treasury figures load; Recent Disbursements shows events or an empty state (not a stuck spinner). |
+| **SEATs → Buy**      | Quantity quote + tranche breakdown appear; approve → purchase completes if you hold the payment token.                           |
+| **SEATs → Refund**   | Quote loads; checkbox + refund tx succeeds if you hold SEATs and treasury is solvent.                                            |
+| **SEATs → Activity** | Status, inactivity timer, and stay-active guidance render for your address.                                                      |
+| **Links**            | Contract addresses match `.env`; external links open.                                                                            |
+
+
+Restart the dev server after changing `.env`. Use an Alchemy/Infura Sepolia RPC for reliable disbursement logs (public RPCs may work with chunked fallback).
+
+**One CID per environment** — staging (Sepolia) and production (mainnet) need separate builds because all `VITE_`* values are baked in at build time. Production builds use `.env.production` (mainnet-only); `npm run dev` uses `.env` with both chains when Sepolia vars are set.
+
+**Before Phase 4**, complete the [Gotchas specific to this app](#gotchas-specific-to-this-app): WalletConnect domain allowlist, rate-limited RPC keys, and a full click-through on a real IPFS gateway (not just `npx serve dist`).
+
+---
+
+
+
 ## How to Run
+
+
 
 ### Prerequisites
 
@@ -14,11 +63,15 @@ Built with React 19, Vite, wagmi v2, RainbowKit, and TanStack Query. Styled with
 - A wallet: MetaMask or any WalletConnect-compatible wallet.
 - An RPC endpoint with high log limits (Alchemy or Infura). Public RPCs cap `eth_getLogs` block ranges too tightly for the disbursements query to succeed reliably.
 
+
+
 ### Install
 
 ```bash
 npm install
 ```
+
+
 
 ### Configure
 
@@ -45,6 +98,8 @@ npm run build          # tsc -b && vite build → outputs to dist/
 npm run preview        # serve the dist/ build locally to sanity-check
 ```
 
+
+
 ### Lint
 
 ```bash
@@ -53,9 +108,12 @@ npm run lint           # oxlint (fast, no config needed)
 
 ---
 
+
+
 ## Deploying to IPFS
 
 The frontend is a fully static bundle after `npm run build`, so it can be hosted on IPFS without any backend. The build is already configured for it.
+
 ### Build
 
 ```bash
@@ -69,13 +127,17 @@ Every path in `dist/index.html` should be relative (`./assets/...`). If you add 
 
 Pick one:
 
-| Service | Notes |
-|---|---|
-| **4EVERLAND** | Connect the GitHub repo, build command `npm run build`, publish dir `dist`. Auto-pins on every push, supports IPFS + Arweave, ENS `contenthash`, and custom domains. Closest to a turn-key Git → IPFS flow. |
-| **web3.storage / Storacha** | `npm i -g @web3-storage/w3cli && w3 login && w3 up dist` returns a CID. Filecoin-backed, has an official GitHub Action for CI deploys. |
-| **Filebase** | S3-compatible IPFS pinning with a dashboard and API. |
-| **Pinata** | Drag `dist/` into the dashboard or use their API. |
-| **Local `ipfs` daemon** | `ipfs add -r dist && ipfs pin add <CID>`. Fine for testing; not durable unless the node stays up. |
+
+| Service                     | Notes                                                                                                                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **4EVERLAND**               | Connect the GitHub repo, build command `npm run build`, publish dir `dist`. Auto-pins on every push, supports IPFS + Arweave, ENS `contenthash`, and custom domains. Closest to a turn-key Git → IPFS flow. |
+| **web3.storage / Storacha** | `npx @web3-storage/w3cli login` (once) → `npx @web3-storage/w3cli space create <name>` → `npm run deploy:ipfs`. Prefer `@storacha/cli` when global install works; on Windows use `npx` if native deps fail. Returns a CID / `*.storacha.link` URL. |
+| **Filebase**                | S3-compatible IPFS pinning with a dashboard and API.                                                                                                                                                        |
+| **Pinata**                  | Drag `dist/` into the dashboard or use their API.                                                                                                                                                           |
+| **Local** `ipfs` **daemon** | `ipfs add -r dist && ipfs pin add <CID>`. Fine for testing; not durable unless the node stays up.                                                                                                           |
+
+
+
 
 ### Give it a stable URL
 
@@ -84,34 +146,42 @@ The CID changes on every deploy. To avoid handing out fresh CIDs each release, p
 - **ENS + IPFS** (Web3-native): set the `contenthash` record on `yourname.eth` to the CID. Users load it via `yourname.eth.limo`, `yourname.eth.link`, Brave, or MetaMask. Update the contenthash per deploy (small gas cost; free-ish on L2 resolvers).
 - **DNSLink**: add a TXT record `_dnslink.yourdomain.com` → `dnslink=/ipfs/<CID>`. Users hit `yourdomain.com` via any gateway.
 
+
+
 ### Gotchas specific to this app
 
 - **WalletConnect**: `VITE_WALLETCONNECT_PROJECT_ID` must be a project whose allowlist in the WalletConnect Cloud dashboard includes every domain you'll serve from: `*.eth.limo`, `*.eth.link`, `*.ipfs.dweb.link`, `*.ipfs.w3s.link`, your ENS name, and any DNSLink or custom domain. Otherwise the modal errors out on the deployed site.
-- **RPC endpoints**: `VITE_RPC_SEPOLIA` / `VITE_RPC_MAINNET` ship in the bundle and are publicly readable. Use rate-keyed Alchemy/Infura URLs, not a private key or unmetered endpoint.
-- **Env vars are baked at build time**: to change any `VITE_*` value you must rebuild and re-pin. Plan on one CID per environment (staging vs. production).
+- **RPC endpoints**: `VITE_RPC_SEPOLIA` / `VITE_RPC_MAINNET` ship in the bundle and are publicly readable. Use rate-keyed Alchemy/Infura URLs, not a private key or unmetered endpoint. For production builds, put the mainnet RPC in **`.env.production.local`** (gitignored) so the API key is not committed.
+- **Env vars are baked at build time**: to change any `VITE_`* value you must rebuild and re-pin. Plan on one CID per environment (staging vs. production).
 - **Test on a real gateway**: `npx serve dist` misses gateway-specific quirks (CSP, subdomain vs. path routing). After pinning, load your CID via `https://<cid>.ipfs.dweb.link` and click through every route before updating ENS.
 
 ---
 
+
+
 ## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `VITE_WALLETCONNECT_PROJECT_ID` | Optional | WalletConnect Cloud project id — enables WalletConnect connectors |
-| `VITE_RPC_SEPOLIA` | Recommended | Alchemy/Infura Sepolia RPC — needed for disbursement log queries |
-| `VITE_RPC_MAINNET` | Recommended | Alchemy/Infura Mainnet RPC |
-| `VITE_SEPOLIA_SEAT_TOKEN` | Yes | SeatToken contract address on Sepolia |
-| `VITE_SEPOLIA_BONDING_TRANCHE` | Yes | BondingTranche address on Sepolia |
-| `VITE_SEPOLIA_PRINCIPAL_MANAGER` | Yes | PrincipalManager address on Sepolia |
-| `VITE_SEPOLIA_PRINCIPAL_MANAGER_DEPLOY_BLOCK` | Recommended | Start block for log queries — avoids scanning from genesis |
-| `VITE_SEPOLIA_EXPLORER_URL` | Optional | Block explorer base URL for transaction links (e.g. `https://sepolia.etherscan.io`) |
-| `VITE_MAINNET_*` | Optional | Same set for mainnet — leave empty until deployed |
+
+| Variable                                      | Required    | Description                                                                         |
+| --------------------------------------------- | ----------- | ----------------------------------------------------------------------------------- |
+| `VITE_WALLETCONNECT_PROJECT_ID`               | Optional    | WalletConnect Cloud project id — enables WalletConnect connectors                   |
+| `VITE_RPC_SEPOLIA`                            | Recommended | Alchemy/Infura Sepolia RPC — needed for disbursement log queries                    |
+| `VITE_RPC_MAINNET`                            | Recommended | Alchemy/Infura Mainnet RPC                                                          |
+| `VITE_SEPOLIA_SEAT_TOKEN`                     | Yes         | SeatToken contract address on Sepolia                                               |
+| `VITE_SEPOLIA_BONDING_TRANCHE`                | Yes         | BondingTranche address on Sepolia                                                   |
+| `VITE_SEPOLIA_PRINCIPAL_MANAGER`              | Yes         | PrincipalManager address on Sepolia                                                 |
+| `VITE_SEPOLIA_PRINCIPAL_MANAGER_DEPLOY_BLOCK` | Recommended | Start block for log queries — avoids scanning from genesis                          |
+| `VITE_SEPOLIA_EXPLORER_URL`                   | Optional    | Block explorer base URL for transaction links (e.g. `https://sepolia.etherscan.io`) |
+| `VITE_MAINNET_*`                              | Production  | Mainnet contract set — see `.env.example`; `npm run build` loads `.env.production` |
+
 
 The payment asset (address, symbol, decimals) is discovered on-chain via `BondingTranche.asset()` at runtime — it is not an env var.
 
 `getSupportedChains()` in `src/config/contracts.ts` determines which chains the RainbowKit modal offers, based on which `VITE_*_SEAT_TOKEN` addresses are set.
 
 ---
+
+
 
 ## Smart Contract Architecture
 
@@ -128,6 +198,7 @@ Key reads: `balanceOf(address)`, `totalSupply()`, `supplyCap()`, `lastActivityAt
 Controls SEAT pricing through a tranche system. Each tranche defines an upper SEAT count bound and a fixed price per SEAT. As total supply crosses tranche boundaries, the price steps up. Because pricing is deterministic per tranche, purchases pay the exact `quotePurchase` amount — no slippage buffer is used in the UI.
 
 Key reads:
+
 - `asset()` — the ERC-20 payment token (e.g. USDC)
 - `currentSeatPrice()` — price in the active tranche
 - `refundPrice()` — fixed protocol-set refund price
@@ -136,6 +207,8 @@ Key reads:
 - `trancheCount()`, `tranche(i)` — tranche bounds and prices
 - `purchase(recipient, quantity, maxCost)` — buy SEATs
 - `refund(seats, recipient)` — burn SEATs and receive payment
+
+
 
 ### PrincipalManager
 
@@ -147,7 +220,11 @@ Key event: `FundingExecuted(address[] recipients, uint256[] amounts)` — emitte
 
 ---
 
+
+
 ## Key User Flows
+
+
 
 ### Buy SEATs
 
@@ -174,11 +251,14 @@ Solvency check: the UI reads `totalManagedAssets() >= totalSupply() * refundPric
 Each holder has an on-chain `lastActivityAt` timestamp. If they don't act within `inactivityPeriod`, they become reclaimable — the protocol can burn their SEATs without refund.
 
 The **SEATs → Activity** tab shows:
+
 - **Status**: `Active` (blue) or `Inactive` (red).
 - Time **until inactive** (or "Now" once eligible).
 - Last activity date and reclaim-eligible date.
 - A `Reclaiming` note explaining the mechanism.
 - **How to stay active**: vote on a Shutter PEN onchain proposal, or buy additional SEATs — both refresh the activity timestamp on-chain.
+
+
 
 ### Dashboard
 
@@ -188,6 +268,8 @@ The **SEATs → Activity** tab shows:
 - **Recent Disbursements**: `eth_getLogs` from `PRINCIPAL_MANAGER_DEPLOY_BLOCK` for `FundingExecuted` events. Block timestamps are fetched for the 5 most recent events. Falls back to 5k-block chunks when the RPC caps the log range.
 
 ---
+
+
 
 ## Frontend Architecture
 
@@ -233,6 +315,8 @@ src/
     └── format.ts            # formatAsset, formatAssetCompact, formatSeats, formatUnixDate, formatDuration
 ```
 
+
+
 ### Provider Stack
 
 ```
@@ -242,6 +326,8 @@ WagmiProvider (wagmiConfig)
               └── HashRouter
                     └── App
 ```
+
+
 
 ### Data Fetching Pattern
 
@@ -259,6 +345,8 @@ wagmi v2 persists wallet connections to localStorage but strips connectors down 
 
 ---
 
+
+
 ## Design
 
 Single light-mode theme matching Shutter's brand:
@@ -270,6 +358,7 @@ Single light-mode theme matching Shutter's brand:
 - **Accents / interactive links**: Shutter blue text (`text-brand-600`)
 
 The Tailwind palette is defined in `tailwind.config.js`:
+
 - `bone` — neutral scale (50 = near-white, 950 = Shutter black `#051016`)
 - `moss` — Shutter yellow scale (500 = `#fde12d`)
 - `brand` — Shutter blue scale (600 = `#0044a4`)
@@ -278,13 +367,18 @@ Class names are aliased to `bone` / `moss` for legacy reasons — `brand` is the
 
 ---
 
+
+
 ## Tech Stack
 
-| Layer | Library |
-|---|---|
-| Framework | React 19 + Vite 8 |
-| Wallet | wagmi v2, RainbowKit, viem v2 |
-| Server state | TanStack Query v5 |
-| Routing | React Router v7 |
-| Styling | Tailwind CSS v3 |
-| Lint | oxlint |
+
+| Layer        | Library                       |
+| ------------ | ----------------------------- |
+| Framework    | React 19 + Vite 8             |
+| Wallet       | wagmi v2, RainbowKit, viem v2 |
+| Server state | TanStack Query v5             |
+| Routing      | React Router v7               |
+| Styling      | Tailwind CSS v3               |
+| Lint         | oxlint                        |
+
+

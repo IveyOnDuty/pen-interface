@@ -5,8 +5,8 @@ import { getExplorerUrl } from '../config/constants'
 
 // External resources.
 const RESOURCES: { label: string; href: string; note?: string }[] = [
-  { label: 'Forum',  href: 'http://holders.vote/h/shutterpen.eth' },
-  { label: 'Voting', href: 'https://snapshot.box/#/org/shutterpen' },
+  { label: 'Forum',  href: 'https://holders.vote/h/shutterpen.eth' },
+  { label: 'Voting', href: 'https://snapshot.box/#/s/shutterpen.eth' },
 ]
 
 function shortAddress(a: string): string {
