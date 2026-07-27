@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "validate:reads": "node scripts/validate-reads.mjs",
+    "deploy:ipfs": "npx @web3-storage/w3cli up dist",
     "preview": "vite preview"
   },
   "dependencies": {
