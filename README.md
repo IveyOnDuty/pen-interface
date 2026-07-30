@@ -6,6 +6,21 @@ Built with React 19, Vite, wagmi v2, RainbowKit, and TanStack Query. Styled with
 
 ---
 
+## IveyOnDuty fork — live deployment
+
+This fork ([IveyOnDuty/pen-interface](https://github.com/IveyOnDuty/pen-interface)) deploys the canonical Shutter PEN frontend to production infrastructure:
+
+| Component | URL / ID |
+|-----------|----------|
+| **Frontend (ENS)** | [shutterpen.eth.limo](https://shutterpen.eth.limo) |
+| **Forum** | [holders.vote/h/shutterpen.eth](https://holders.vote/h/shutterpen.eth) |
+| **Voting** | [snapshot.box/#/s/shutterpen.eth](https://snapshot.box/#/s/shutterpen.eth) |
+| **Upstream** | [shutter-network/pen-interface](https://github.com/shutter-network/pen-interface) |
+
+Operational docs: [DEPLOYMENT.md](./DEPLOYMENT.md) (runbook), [DEPLOYMENTS.md](./DEPLOYMENTS.md) (CID log), [LEARNING.md](./LEARNING.md) (architecture notes).
+
+---
+
 ## Roadmap
 
 Rollout phases for taking the frontend from local dev to a live deployment. Each phase links to the relevant section below.
