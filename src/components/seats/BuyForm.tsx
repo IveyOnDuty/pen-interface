@@ -5,43 +5,39 @@ import { useBuySeats } from '../../hooks/useBuySeats'
 import { useDashboard } from '../../hooks/useDashboard'
 import { useTranches } from '../../hooks/useTranches'
 import { formatAsset, formatSeats } from '../../lib/format'
+import { splitAcrossTranches } from '../../lib/tranches'
 import { getExplorerUrl } from '../../config/constants'
+import { MultiBuyForm } from './MultiBuyForm'
 
-type TrancheSegment = {
-  trancheIndex: number
-  seats: bigint
-  pricePerSeat: bigint
-  subtotal: bigint
-}
+type BuyMode = 'single' | 'batch'
 
-function splitAcrossTranches(
-  quantity: bigint,
-  soldAtStart: bigint,
-  tranches: { upperBound: bigint; pricePerSeat: bigint }[],
-): TrancheSegment[] {
-  const segments: TrancheSegment[] = []
-  let remaining = quantity
-  let cursor = soldAtStart
-  for (let i = 0; i < tranches.length && remaining > 0n; i++) {
-    const t = tranches[i]
-    if (cursor >= t.upperBound) continue
-    const availableInTranche = t.upperBound - cursor
-    const seatsHere = remaining < availableInTranche ? remaining : availableInTranche
-    if (seatsHere > 0n) {
-      segments.push({
-        trancheIndex: i,
-        seats: seatsHere,
-        pricePerSeat: t.pricePerSeat,
-        subtotal: seatsHere * t.pricePerSeat,
-      })
-    }
-    remaining -= seatsHere
-    cursor += seatsHere
-  }
-  return segments
-}
-
+// Wraps the buy panel with a Single / Batch toggle. Each mode's form is its own
+// component so its hooks (quotes, allowance reads) only run while it's mounted.
 export function BuyForm() {
+  const [mode, setMode] = useState<BuyMode>('single')
+
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-1 p-1 bg-bone-100 rounded-lg">
+        {(['single', 'batch'] as BuyMode[]).map(m => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-colors ${
+              mode === m ? 'bg-bone-50 text-bone-950 shadow-sm' : 'text-bone-500 hover:text-bone-700'
+            }`}
+          >
+            {m === 'single' ? 'Single' : 'Batch'}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'single' ? <SingleBuyForm /> : <MultiBuyForm />}
+    </div>
+  )
+}
+
+function SingleBuyForm() {
   const { address } = useAccount()
   const chainId = useChainId()
   const explorerUrl = getExplorerUrl(chainId)

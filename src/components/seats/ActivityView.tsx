@@ -88,17 +88,18 @@ function RefreshAllVotersCard() {
   const buttonLabel =
     r.step === 'scanning' ? 'Finding voters…'
     : r.step === 'refreshing' ? 'Refreshing…'
-    : 'Refresh all voters'
+    : 'Refresh status'
 
   return (
     <div className="rounded-xl border border-bone-200 bg-bone-50/60 p-5 space-y-3">
       <div>
         <div className="text-xs font-semibold uppercase tracking-wider text-bone-500">
-          Refresh all voters
+          Refresh status
         </div>
-        <div className="text-sm text-bone-800 mt-1">
-          Refresh onchain activity for every SEAT holder who voted on a proposal, in a single
-          transaction. Anyone can run this — non-voters and non-holders are skipped automatically.
+        <div className="text-sm text-bone-800 mt-1 space-y-2">
+          <p>Refresh the SEAT status for all Shutter PEN members after an onchain proposal / vote.</p>
+          <p>All voters will see their "Active" status extended for 1 year. All non-voters will see no change.</p>
+          <p>Anyone can run this action.</p>
         </div>
       </div>
 

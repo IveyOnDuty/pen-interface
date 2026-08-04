@@ -5,26 +5,31 @@ import { getContracts } from '../config/contracts'
 import { BondingTrancheAbi } from '../abis/BondingTranche'
 import { ERC20Abi } from '../abis/ERC20'
 import { usePaymentAsset } from './usePaymentAsset'
+import { parseContractError } from './useBuySeats'
+import type { BuyStep } from './useBuySeats'
 
-export type BuyStep = 'idle' | 'quoting' | 'needs-approve' | 'approving' | 'ready' | 'purchasing' | 'success' | 'error'
-
-export function useBuySeats() {
+/**
+ * Batch-buy controller. The caller (form) owns the raw row inputs and their
+ * validation, and passes in the already-validated, non-empty parallel arrays
+ * `recipients` / `amounts`. Pricing is a pure function of the supply range the
+ * batch crosses, so — exactly like the on-chain `multiPurchase` — the whole
+ * batch is quoted once as `quotePurchase(totalSeats)`, independent of how the
+ * seats are split across recipients. Payment (approve/allowance/balance) always
+ * comes from the connected buyer.
+ */
+export function useMultiBuySeats(recipients: `0x${string}`[], amounts: bigint[]) {
   const { address } = useAccount()
   const chainId = useChainId()
   const c = getContracts(chainId)
   const { data: asset } = usePaymentAsset()
 
   const queryClient = useQueryClient()
-  const [quantity, setQuantity] = useState(1n)
   const [step, setStep] = useState<BuyStep>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  // Recipient of the SEATs. `undefined` means "buy for myself" (the connected
-  // wallet). Payment (approve/allowance/balance) always comes from the buyer;
-  // only the on-chain `recipient` of the mint differs.
-  const [recipient, setRecipient] = useState<`0x${string}` | undefined>(undefined)
 
-  // Static reads — balance and allowance don't depend on quantity.
-  // Kept separate so they never refetch (and flicker) when quantity changes.
+  const totalSeats = amounts.reduce((sum, a) => sum + a, 0n)
+
+  // Static reads — balance and allowance don't depend on the batch total.
   const { data: staticReads, refetch: refetchStatic } = useReadContracts({
     contracts: [
       {
@@ -43,7 +48,7 @@ export function useBuySeats() {
     query: { enabled: !!address && !!asset?.address },
   })
 
-  // Dynamic read — quote changes with every quantity update.
+  // Dynamic read — one aggregate quote over the batch total.
   const {
     data: quotedCost,
     status: quoteStatus,
@@ -52,11 +57,9 @@ export function useBuySeats() {
     address: c.bondingTranche,
     abi: BondingTrancheAbi,
     functionName: 'quotePurchase',
-    args: [quantity],
+    args: [totalSeats],
     query: {
-      // Read-only quote — runs even without a connected wallet so the cost
-      // breakdown is visible before connecting.
-      enabled: quantity > 0n,
+      enabled: totalSeats > 0n,
       placeholderData: keepPreviousData,
       retry: (_, error) => {
         const msg = (error as { message?: string; shortMessage?: string })?.shortMessage
@@ -71,19 +74,23 @@ export function useBuySeats() {
   const allowance = staticReads?.[0]?.result as bigint | undefined
   const balance   = staticReads?.[1]?.result as bigint | undefined
   // Price is fixed per tranche — pay exactly the quoted cost, no slippage buffer.
-  const maxCost   = quotedCost
-  const quoteFailed   = quoteStatus === 'error'
-  const quotePending  = quoteIsFetching || quoteStatus === 'pending'
+  const maxCost   = totalSeats > 0n ? quotedCost : undefined
+  const quoteFailed   = totalSeats > 0n && quoteStatus === 'error'
+  const quotePending  = totalSeats > 0n && (quoteIsFetching || quoteStatus === 'pending')
   const insufficientBalance = balance !== undefined && maxCost !== undefined && balance < maxCost
 
   useEffect(() => {
     if (!maxCost || allowance === undefined) return
     if (step === 'success' || step === 'approving' || step === 'purchasing') return
-    // Once we've reached `ready`, don't regress to `needs-approve` on a stale
-    // allowance refetch — only advance forward (needs-approve → ready).
+    // Once at `ready`, don't regress on a stale allowance refetch.
     if (step === 'ready' && allowance >= maxCost) return
     setStep(allowance >= maxCost ? 'ready' : 'needs-approve')
   }, [maxCost, allowance, step])
+
+  // No rows yet → sit at idle regardless of any stale quote.
+  useEffect(() => {
+    if (totalSeats === 0n && step !== 'success' && step !== 'purchasing') setStep('idle')
+  }, [totalSeats, step])
 
   const { writeContractAsync: writeApprove, data: approveTxHash } = useWriteContract()
   const { isLoading: approveLoading, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveTxHash })
@@ -115,15 +122,15 @@ export function useBuySeats() {
   }
 
   async function purchase() {
-    if (!address || !maxCost) return
+    if (!address || !maxCost || recipients.length === 0) return
     setErrorMsg(null)
     setStep('purchasing')
     try {
       await writePurchase({
         address: c.bondingTranche,
         abi: BondingTrancheAbi,
-        functionName: 'purchase',
-        args: [recipient ?? address, quantity, maxCost],
+        functionName: 'multiPurchase',
+        args: [recipients, amounts, maxCost],
       })
     } catch (e: unknown) {
       setErrorMsg(parseContractError(e))
@@ -131,13 +138,12 @@ export function useBuySeats() {
     }
   }
 
-  function reset() { setQuantity(1n); setStep('idle'); setErrorMsg(null); setRecipient(undefined) }
+  function reset() { setStep('idle'); setErrorMsg(null) }
   function clearError() { setErrorMsg(null) }
 
   return {
-    quantity, setQuantity,
-    recipient, setRecipient,
-    quotedCost, balance,
+    totalSeats,
+    quotedCost: maxCost, balance,
     quoteFailed, quotePending, insufficientBalance,
     asset,
     step,
@@ -147,19 +153,4 @@ export function useBuySeats() {
     purchaseTxHash,
     approve, purchase, reset, clearError,
   }
-}
-
-export function parseContractError(e: unknown): string {
-  const msg = (e as { shortMessage?: string; message?: string })?.shortMessage
-    ?? (e as { message?: string })?.message
-    ?? 'Transaction failed'
-  if (msg.includes('SoldOut')) return 'All seats in this tranche are sold out.'
-  if (msg.includes('PurchaseCostExceedsLimit')) return 'Price moved — please refresh and try again.'
-  if (msg.includes('PrincipalManagerPaused') || msg.includes('Paused')) return 'Purchases are temporarily paused.'
-  if (msg.includes('InsufficientSeatsAvailable')) return 'Not enough seats available. Reduce quantity.'
-  if (msg.includes('InvalidBatchInput')) return 'Add at least one recipient with a quantity.'
-  if (msg.includes('InvalidRecipient')) return 'One of the recipient addresses is invalid.'
-  if (msg.includes('InvalidAmount')) return 'Each recipient needs a quantity of at least 1.'
-  if (msg.includes('User rejected')) return 'Transaction rejected.'
-  return msg.slice(0, 120)
 }
