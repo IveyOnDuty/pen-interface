@@ -92,9 +92,9 @@ From [shutter-pen-deployment-artifacts](https://github.com/shutter-network/shutt
 
 | Contract | Mainnet |
 |----------|---------|
-| SeatToken | `0x814E141206b69afE94F298c080D8431e23473aB0` |
-| BondingTranche | `0x83F34180111B69A85321BD95940B4647D780Cac1` |
-| PrincipalManager | `0xCD93e9f8AbC0a22Cf2ae1435fb19b69c7E2ddE27` |
-| Safe | `0xf8C833336050Df1dc421481E645aBD6D3f990574` |
+| SeatToken | `0xe2F401A0fb40dA191b9fa8C44Fa09D31cE17374c` |
+| BondingTranche | `0x652a9A770f9Cfe26e409Aa63E84B8a4e21abe1e5` |
+| PrincipalManager | `0x4517651c7071fecDA97Eb656a9d3A50B92b84517` |
+| Safe | `0xB7f69C3cd9E3dFB4aE0Ed9ee65eb2Ed42EdeECE3` |
 
 See `.env.example` for the full variable list.

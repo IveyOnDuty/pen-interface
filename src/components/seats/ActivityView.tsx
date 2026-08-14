@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useSeatActivity } from '../../hooks/useSeatActivity'
+import { useRefreshAllActivity } from '../../hooks/useRefreshAllActivity'
 import { formatSeats, formatUnixDate, formatDuration } from '../../lib/format'
 
 interface Props {
@@ -53,6 +55,91 @@ export function ActivityView({ onGoToBuy }: Props) {
       <StatusCard a={a} />
       <ReclaimingNote />
       <ActivityExplainer />
+      <RefreshAllVotersCard />
+    </div>
+  )
+}
+
+// Permissionless keeper action: refresh onchain activity for every voter of a proposal
+// in one transaction. Defaults to the latest proposal, with a manual id override.
+function RefreshAllVotersCard() {
+  const r = useRefreshAllActivity()
+  const [idInput, setIdInput] = useState('')
+
+  // Seed the input with the latest proposal id once it loads (unless the user typed one).
+  useEffect(() => {
+    if (idInput === '' && r.latestProposalId !== undefined) {
+      setIdInput(r.latestProposalId.toString())
+    }
+  }, [r.latestProposalId])
+
+  const busy = r.step === 'scanning' || r.step === 'refreshing'
+
+  let parsedId: bigint | null = null
+  try {
+    if (idInput.trim() !== '') {
+      const n = BigInt(idInput.trim())
+      if (n >= 0n) parsedId = n
+    }
+  } catch {
+    parsedId = null
+  }
+
+  const buttonLabel =
+    r.step === 'scanning' ? 'Finding voters…'
+    : r.step === 'refreshing' ? 'Refreshing…'
+    : 'Refresh status'
+
+  return (
+    <div className="rounded-xl border border-bone-200 bg-bone-50/60 p-5 space-y-3">
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-bone-500">
+          Refresh status
+        </div>
+        <div className="text-sm text-bone-800 mt-1 space-y-2">
+          <p>Refresh the SEAT status for all Shutter PEN members after an onchain proposal / vote.</p>
+          <p>All voters will see their "Active" status extended for 1 year. All non-voters will see no change.</p>
+          <p>Anyone can run this action.</p>
+        </div>
+      </div>
+
+      <div className="flex items-end gap-3">
+        <label className="flex-1">
+          <span className="block text-xs text-bone-500 mb-1">Proposal ID</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={idInput}
+            onChange={(e) => { setIdInput(e.target.value); if (r.step !== 'idle') r.reset() }}
+            placeholder={r.latestProposalId !== undefined ? r.latestProposalId.toString() : 'latest'}
+            disabled={busy}
+            className="w-full rounded-lg border border-bone-200 bg-white px-3 py-2 text-sm text-bone-950 tabular-nums focus:outline-none focus:ring-2 focus:ring-moss-400 disabled:opacity-50"
+          />
+        </label>
+        <button
+          onClick={() => parsedId !== null && r.refresh(parsedId)}
+          disabled={busy || !r.spaceReady || parsedId === null}
+          className="px-4 py-2 rounded-lg bg-moss-500 hover:bg-moss-600 text-bone-950 text-sm font-semibold transition-colors disabled:opacity-50"
+        >
+          {buttonLabel}
+        </button>
+      </div>
+
+      {r.latestProposalId !== undefined && (
+        <div className="text-xs text-bone-500">
+          Latest proposal: #{r.latestProposalId.toString()}
+        </div>
+      )}
+
+      {r.step === 'success' && (
+        <div className="text-sm font-medium text-brand-600">
+          Activity refreshed{r.voterCount !== null ? ` for ${r.voterCount} voter${r.voterCount === 1 ? '' : 's'}` : ''}.
+        </div>
+      )}
+
+      {r.step === 'error' && r.errorMsg && (
+        <div className="text-sm font-medium text-red-600">{r.errorMsg}</div>
+      )}
     </div>
   )
 }

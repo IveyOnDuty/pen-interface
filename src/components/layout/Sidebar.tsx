@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import shutterLogo from '../../assets/shutter-signet.svg'
+import shutterLogo from '../../assets/shutter-pen-logo-white-512.png'
 
 const NAV = [
   { to: '/seats',   label: 'SEATs',   icon: '◈' },

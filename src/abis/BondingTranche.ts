@@ -24,6 +24,17 @@ export const BondingTrancheAbi = [
     outputs: [{ name: 'totalCost', type: 'uint256' }],
   },
   {
+    name: 'multiPurchase',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'recipients', type: 'address[]' },
+      { name: 'amounts', type: 'uint256[]' },
+      { name: 'maxCost', type: 'uint256' },
+    ],
+    outputs: [{ name: 'totalCost', type: 'uint256' }],
+  },
+  {
     name: 'refund',
     type: 'function',
     stateMutability: 'nonpayable',
